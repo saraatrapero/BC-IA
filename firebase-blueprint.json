@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User specific information and roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    },
+    "GlobalConfig": {
+      "title": "Global Configuration",
+      "description": "Global costs and settings for the business case calculations",
+      "type": "object",
+      "properties": {
+        "capilarCost": { "type": "number" },
+        "camionCost": { "type": "number" },
+        "palletCost": { "type": "number" },
+        "baseProductionCost": { "type": "number" },
+        "taxRate": { "type": "number" }
+      },
+      "required": ["capilarCost", "camionCost", "palletCost", "taxRate"]
+    },
+    "businessCase": {
+      "title": "Business Case",
+      "description": "A business case calculation record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "years": { "type": "number" },
+        "references": { "type": "array" },
+        "logisticsType": { "type": "string" },
+        "geographicService": { "type": "array" },
+        "totalMargin": { "type": "number" },
+        "totalBenefit": { "type": "number" },
+        "totalTax": { "type": "number" },
+        "summary": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "CatalogProduct": {
+      "title": "Catalog Product",
+      "description": "Product master data reference",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "family": { "type": "string" },
+        "brand": { "type": "string" },
+        "format": { "type": "string" },
+        "packaging": { "type": "string" },
+        "material": { "type": "string" }
+      },
+      "required": ["name", "family", "brand"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "configs/global": {
+      "schema": "GlobalConfig",
+      "description": "Shared application costs and settings"
+    },
+    "businessCases/{caseId}": {
+      "schema": "BusinessCase",
+      "description": "Business case records"
+    },
+    "catalogProducts/{productId}": {
+      "schema": "CatalogProduct",
+      "description": "Master list of products"
+    }
+  }
+}

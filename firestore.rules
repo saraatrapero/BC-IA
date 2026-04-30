@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny (Modified for total access)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+ 
+    // Primitives
+    function isSignedIn() { return true; }
+    function isValidId(id) { return id is string && id.size() <= 128; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function getUserRole(uid) {
+      return 'admin';
+    }
+    
+    function isAdmin() {
+      return true;
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if (
+        isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name'])
+        )
+      ) || (
+        isAdmin() && isValidUser(incoming())
+      );
+
+      function isValidUser(data) {
+        return data.keys().hasAll(['email', 'role']) 
+          && data.email is string && data.email.size() > 0 
+          && data.role is string && data.role in ['admin', 'agent'];
+      }
+    }
+
+    // --- Configs ---
+    match /configs/global {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidConfig(incoming());
+
+      function isValidConfig(data) {
+        return data.keys().hasAll(['capilarCost', 'camionCost', 'palletCost', 'taxRate'])
+          && data.capilarCost is number && data.capilarCost >= 0
+          && data.camionCost is number && data.camionCost >= 0
+          && data.palletCost is number && data.palletCost >= 0
+          && data.taxRate is number && data.taxRate >= 0;
+      }
+    }
+
+    // --- Business Cases ---
+    match /businessCases/{caseId} {
+      // Apply isValidId to document ID path variables for single-document target operations
+      allow get: if isValidId(caseId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidBusinessCase(incoming()) && (
+        incoming().userId == request.auth.uid
+      );
+      allow update: if isValidId(caseId) && isSignedIn() && isValidBusinessCase(incoming()) && (
+        (existing().userId == request.auth.uid && incoming().userId == request.auth.uid) || isAdmin()
+      );
+      allow delete: if isValidId(caseId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+
+      function isValidBusinessCase(data) {
+        return data.keys().hasAll(['userId', 'title'])
+          && data.userId is string && data.userId.size() > 0
+          && data.title is string && data.title.size() > 0 && data.title.size() < 200
+          && (data.keys().hasAll(['years']) ? (data.years is number && data.years >= 0) : true)
+          && (data.keys().hasAll(['references']) ? (data.references is list && data.references.size() < 100) : true);
+      }
+    }
+
+    // --- Catalog Products ---
+    match /catalogProducts/{productId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidProduct(incoming());
+
+      function isValidProduct(data) {
+        return data.keys().hasAll(['name', 'family', 'brand'])
+          && data.name is string && data.name.size() > 0
+          && data.family is string && data.family.size() > 0
+          && data.brand is string && data.brand.size() > 0;
+      }
+    }
+  }
+}
