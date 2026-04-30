@@ -1,23 +1,26 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny (Modified for total access)
+    // Default deny
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
  
     // Primitives
-    function isSignedIn() { return true; }
-    function isValidId(id) { return id is string && id.size() <= 128; }
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     
     function getUserRole(uid) {
-      return 'admin';
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
     
     function isAdmin() {
-      return true;
+      return isSignedIn() && (
+        getUserRole(request.auth.uid) == 'admin' ||
+        request.auth.token.email == 'jtrapero2013@gmail.com' // Bootstrap admin
+      );
     }
 
     // --- Users ---

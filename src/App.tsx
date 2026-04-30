@@ -27,24 +27,24 @@ export default function App() {
         // Fetch or create profile
         const profileDoc = await getDoc(doc(db, 'users', u.uid));
         if (profileDoc.exists()) {
-          const data = profileDoc.data() as UserProfile;
-          data.role = UserRole.ADMIN; // Forzar admin temporalmente
-          setProfile(data);
+          setProfile(profileDoc.data() as UserProfile);
         } else {
           // Default to agent for new users
           const newProfile: UserProfile = {
             uid: u.uid,
             email: u.email || '',
-            role: UserRole.ADMIN, // Acceso total temporal
+            role: UserRole.AGENT,
             name: u.displayName || u.email?.split('@')[0] || 'User'
           };
+          // Check if it's the bootstrap admin
+          if (u.email === 'jtrapero2013@gmail.com') {
+            newProfile.role = UserRole.ADMIN;
+          }
           await setDoc(doc(db, 'users', u.uid), newProfile);
           setProfile(newProfile);
         }
       } else {
-        // MOCK USER FOR DIRECT ACCESS
-        setUser({ uid: 'mock-admin', email: 'admin@total.access' } as any);
-        setProfile({ uid: 'mock-admin', email: 'admin@total.access', role: UserRole.ADMIN, name: 'Admin Temporal' });
+        setProfile(null);
       }
       setLoading(false);
     });
@@ -58,6 +58,10 @@ export default function App() {
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
+  }
+
+  if (!user) {
+    return <Auth />;
   }
 
   return (
