@@ -5,8 +5,9 @@ import { auth, db } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { BusinessCase, CatalogProduct } from '../types';
+import { BusinessCase, CatalogProduct, ReferenceInput } from '../types';
 import ProductSelector from './ProductSelector';
+import NewCaseModal from './NewCaseModal';
 
 interface ChatAgentProps {
   onFinished: (id: string) => void;
@@ -20,6 +21,7 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showSelector, setShowSelector] = useState(false);
+  const [reviewData, setReviewData] = useState<Partial<BusinessCase> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,8 +50,11 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
     }
   };
 
-  const onProductSelect = (product: CatalogProduct) => {
-    const info = `He seleccionado el producto: ${product.name} (Marca: ${product.brand}, Formato: ${product.format}, Envase: ${product.packaging}).`;
+  const onProductsConfirm = (references: ReferenceInput[]) => {
+    const productsList = references.map(r => 
+      `${r.name} (${r.litersPerYear} L/año, ${r.netPrice} €/L, ${r.rappel}% rappel)`
+    ).join(', ');
+    const info = `He seleccionado los siguientes productos: ${productsList}.`;
     handleSend(info);
     setShowSelector(false);
   };
@@ -66,46 +71,42 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
         return;
       }
 
-      const newCase: any = {
-        ...data,
-        userId: auth.currentUser?.uid,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const docRef = await addDoc(collection(db, 'businessCases'), newCase);
-      onFinished(docRef.id);
+      setReviewData(data);
     } catch (error) {
       console.error(error);
-      alert("Error al guardar el caso de negocio.");
+      alert("Error al extraer datos del caso.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full glass-card max-w-4xl mx-auto overflow-hidden shadow-xl border-slate-200">
+    <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl rounded-[2rem] border border-[#1c2621]/8 max-w-4xl mx-auto overflow-hidden shadow-[0_10px_40px_-10px_rgba(15,76,58,0.04)]">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 bg-white/50 flex justify-between items-center">
+      <div className="p-5 border-b border-[#1c2621]/8 bg-gradient-to-r from-white via-white to-[#faf8f5] flex justify-between items-center select-none">
         <div>
-          <h2 className="font-bold text-slate-800 flex items-center gap-2">
-            <Bot size={20} className="text-blue-600" />
-            Asistente de Business Case
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[9px] uppercase font-bold tracking-widest text-[#0f4c3a] bg-[#0f4c3a]/10 px-2.5 py-0.5 rounded-md">Atelier IA</span>
+            <span className="w-1.5 h-1.5 bg-[#0f4c3a] rounded-full animate-bounce" />
+          </div>
+          <h2 className="font-extrabold text-[#1c2621] text-base flex items-center gap-2">
+            <Bot size={18} className="text-[#0f4c3a]" />
+            Colega Virtual Cora
           </h2>
-          <p className="text-xs text-slate-500">Completa los datos para generar tu análisis</p>
+          <p className="text-xs text-[#5a6561]">Diseña tu propuesta comercial conversando interactivamente</p>
         </div>
         <button
           onClick={handleSave}
           disabled={saving || loading}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all font-semibold shadow-sm"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#0f4c3a] text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all font-bold text-xs tracking-wide uppercase shadow-[0_4px_12px_rgba(15,76,58,0.15)] cursor-pointer"
         >
-          {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+          {saving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
           Generar Caso
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-[#faf8f5]/30" ref={scrollRef}>
         <AnimatePresence initial={false}>
           {messages.map((m, i) => (
             <motion.div
@@ -114,18 +115,20 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
               animate={{ opacity: 1, x: 0 }}
               className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div className={`flex gap-3 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
-                  m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-blue-600'
+              <div className={`flex gap-3.5 max-w-[85%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(15,76,58,0.04)] border ${
+                  m.role === 'user' 
+                    ? 'bg-[#0f4c3a] border-[#0f4c3a] text-white' 
+                    : 'bg-white border-[#1c2621]/10 text-[#0f4c3a]'
                 }`}>
                   {m.role === 'user' ? <User size={16} /> : <Bot size={16} />}
                 </div>
-                <div className={`p-3 rounded-2xl text-sm leading-relaxed ${
+                <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-[0_4px_16px_rgba(0,0,0,0.015)] ${
                   m.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none shadow-md shadow-blue-100' 
-                    : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'
+                    ? 'bg-[#0f4c3a] text-white rounded-tr-none' 
+                    : 'bg-white border border-[#1c2621]/8 text-[#1c2621] rounded-tl-none'
                 }`}>
-                  <div className="markdown-body prose prose-sm max-w-none prose-slate">
+                  <div className={`markdown-body prose prose-sm max-w-none ${m.role === 'user' ? 'prose-invert text-white' : 'prose-slate text-[#1c2621]'}`}>
                     <ReactMarkdown>
                       {m.text}
                     </ReactMarkdown>
@@ -135,13 +138,13 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
             </motion.div>
           ))}
           {loading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 text-blue-600 flex items-center justify-center">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3.5">
+              <div className="w-9 h-9 rounded-xl bg-white border border-[#1c2621]/10 text-[#0f4c3a] flex items-center justify-center shadow-[0_2px_8px_rgba(15,76,58,0.04)]">
                 <Bot size={16} />
               </div>
-              <div className="p-3 bg-white border border-slate-200 rounded-2xl rounded-tl-none flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                <span className="text-sm text-slate-500">Pensando...</span>
+              <div className="p-4 bg-white border border-[#1c2621]/8 rounded-2xl rounded-tl-none flex items-center gap-2.5 shadow-[0_4px_16px_rgba(0,0,0,0.015)]">
+                <Loader2 className="w-4 h-4 animate-spin text-[#0f4c3a]" />
+                <span className="text-xs font-bold text-[#6a7470] tracking-wider uppercase">Cora analizando...</span>
               </div>
             </motion.div>
           )}
@@ -149,11 +152,11 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
       </div>
 
       {/* Input */}
-      <div className="p-4 bg-white border-t border-slate-200">
-        <div className="flex gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+      <div className="p-5 bg-white border-t border-[#1c2621]/8">
+        <div className="flex gap-2.5 p-2 bg-[#faf8f5] border border-[#1c2621]/8 rounded-2xl focus-within:ring-2 focus-within:ring-[#0f4c3a]/15 focus-within:border-[#0f4c3a]/30 transition-all">
           <button
             onClick={() => setShowSelector(true)}
-            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all"
+            className="p-2 text-[#6a7470] hover:text-[#0f4c3a] hover:bg-white rounded-xl transition-all"
             title="Seleccionar del catálogo"
           >
             <List size={20} />
@@ -163,27 +166,37 @@ export default function ChatAgent({ onFinished }: ChatAgentProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Responde al asistente o selecciona un producto..."
-            className="flex-1 bg-transparent px-3 py-2 text-sm outline-none"
+            placeholder="Escribe aquí para conversar o selecciona productos del catálogo..."
+            className="flex-1 bg-transparent px-3 text-sm outline-none text-[#1c2621] placeholder-[#6a7470]/50 font-medium"
           />
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || loading}
-            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-95"
+            className="p-2.5 bg-[#0f4c3a] text-white rounded-xl hover:bg-[#0f4c3a]/90 disabled:opacity-50 transition-all shadow-[0_4px_12px_rgba(15,76,58,0.15)] active:scale-95 cursor-pointer"
           >
-            <Send size={18} />
+            <Send size={16} />
           </button>
         </div>
-        <p className="text-[10px] text-center text-slate-400 mt-2">
-          Usa el icono de lista para seleccionar productos del catálogo oficial.
+        <p className="text-[10px] text-center text-[#6a7470] mt-3 font-medium">
+          💡 Puedes pulsar sobre el icono de lista para insertar productos reales del catálogo oficial directamente en tu propuesta.
         </p>
       </div>
 
       <AnimatePresence>
         {showSelector && (
           <ProductSelector 
-            onSelect={onProductSelect}
+            onConfirm={onProductsConfirm}
             onClose={() => setShowSelector(false)}
+          />
+        )}
+        {reviewData && (
+          <NewCaseModal 
+            initialData={reviewData}
+            onClose={() => setReviewData(null)}
+            onSuccess={(id) => {
+              setReviewData(null);
+              onFinished(id);
+            }}
           />
         )}
       </AnimatePresence>

@@ -1,6 +1,11 @@
 {
-  "name": "Business Case AI Pro",
-  "description": "Una aplicación avanzada impulsada por IA para calcular y analizar casos de negocio (Business Cases), con gestión de costes logísticos y proyecciones financieras.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
+  "name": "BC AI Pro",
+  "description": "Herramienta avanzada de análisis de Business Case con gestión de logística capilar, amortización de equipos y rentabilidad real.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

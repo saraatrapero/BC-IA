@@ -12,17 +12,16 @@
       "required": ["email", "role"]
     },
     "GlobalConfig": {
-      "title": "Global Configuration",
-      "description": "Global costs and settings for the business case calculations",
+      "title": "Global Config",
+      "description": "Global costs and parameters",
       "type": "object",
       "properties": {
-        "capilarCost": { "type": "number" },
-        "camionCost": { "type": "number" },
-        "palletCost": { "type": "number" },
-        "baseProductionCost": { "type": "number" },
-        "taxRate": { "type": "number" }
+        "halfTruckDoubleDropFee": { "type": "number" },
+        "defaultAmortizationYears": { "type": "number" },
+        "truckCostPerKm": { "type": "number" },
+        "palletCostPerKm": { "type": "number" }
       },
-      "required": ["capilarCost", "camionCost", "palletCost", "taxRate"]
+      "required": ["halfTruckDoubleDropFee", "defaultAmortizationYears"]
     },
     "businessCase": {
       "title": "Business Case",
@@ -32,12 +31,9 @@
         "userId": { "type": "string" },
         "title": { "type": "string" },
         "years": { "type": "number" },
-        "references": { "type": "array" },
         "logisticsType": { "type": "string" },
+        "references": { "type": "array" },
         "geographicService": { "type": "array" },
-        "totalMargin": { "type": "number" },
-        "totalBenefit": { "type": "number" },
-        "totalTax": { "type": "number" },
         "summary": { "type": "string" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
@@ -54,9 +50,73 @@
         "brand": { "type": "string" },
         "format": { "type": "string" },
         "packaging": { "type": "string" },
-        "material": { "type": "string" }
+        "material": { "type": "string" },
+        "cost": { "type": "number" }
       },
-      "required": ["name", "family", "brand"]
+      "required": ["name", "family", "brand", "cost"]
+    },
+    "BrandLogistics": {
+      "title": "Brand Logistics",
+      "description": "Logistics origin for each brand",
+      "type": "object",
+      "properties": {
+        "brand": { "type": "string" },
+        "origin": { "type": "string" }
+      },
+      "required": ["brand", "origin"]
+    },
+    "ColdEquipment": {
+      "title": "Cold Equipment",
+      "description": "Refrigeration equipment data",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "amortizationYears": { "type": "number" }
+      },
+      "required": ["name", "price", "amortizationYears"]
+    },
+    "FixedCost": {
+      "title": "Fixed Cost",
+      "description": "Business fixed costs (salaries, office, etc)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "monthlyAmount": { "type": "number" }
+      },
+      "required": ["name", "monthlyAmount"]
+    },
+    "MaintenanceCost": {
+      "title": "Maintenance Cost",
+      "description": "Maintenance and cleaning costs",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "amount": { "type": "number" }
+      },
+      "required": ["name", "amount"]
+    },
+    "CapillaryRule": {
+      "title": "Capillary Rule",
+      "description": "Distribution cost rule for capillary logistics",
+      "type": "object",
+      "properties": {
+        "family": { "type": "string" },
+        "format": { "type": "string" },
+        "packaging": { "type": "string" },
+        "baseCost": { "type": "number" }
+      },
+      "required": ["family", "format", "packaging", "baseCost"]
+    },
+    "CoraTrainingRule": {
+      "title": "Cora Training Rule",
+      "description": "Rule to train Cora's assistant answers based on specific phrase mappings",
+      "type": "object",
+      "properties": {
+        "phrase": { "type": "string" },
+        "response": { "type": "string" }
+      },
+      "required": ["phrase", "response"]
     }
   },
   "firestore": {
@@ -75,6 +135,30 @@
     "catalogProducts/{productId}": {
       "schema": "CatalogProduct",
       "description": "Master list of products"
+    },
+    "brandLogistics/{brandId}": {
+      "schema": "BrandLogistics",
+      "description": "Logistics origin by brand"
+    },
+    "coldEquipment/{equipId}": {
+      "schema": "ColdEquipment",
+      "description": "Catalog of cold equipment"
+    },
+    "fixedCosts/{costId}": {
+      "schema": "FixedCost",
+      "description": "General fixed costs"
+    },
+    "maintenanceCosts/{mId}": {
+      "schema": "MaintenanceCost",
+      "description": "Maintenance costs"
+    },
+    "capillaryRules/{ruleId}": {
+      "schema": "CapillaryRule",
+      "description": "Specific capillary cost rules"
+    },
+    "coraTraining/{ruleId}": {
+      "schema": "CoraTrainingRule",
+      "description": "Cora voice assistant learning rules"
     }
   }
 }

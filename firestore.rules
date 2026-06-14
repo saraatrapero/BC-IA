@@ -18,8 +18,8 @@ service cloud.firestore {
     
     function isAdmin() {
       return isSignedIn() && (
-        getUserRole(request.auth.uid) == 'admin' ||
-        request.auth.token.email == 'jtrapero2013@gmail.com' // Bootstrap admin
+        request.auth.token.email.toLower() == 'jtrapero2013@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole(request.auth.uid) == 'admin')
       );
     }
 
@@ -27,7 +27,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
-      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidUser(incoming());
       allow update: if (
         isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && (
           incoming().diff(existing()).affectedKeys().hasOnly(['name'])
@@ -35,10 +35,11 @@ service cloud.firestore {
       ) || (
         isAdmin() && isValidUser(incoming())
       );
+      allow delete: if isAdmin();
 
       function isValidUser(data) {
         return data.keys().hasAll(['email', 'role']) 
-          && data.email is string && data.email.size() > 0 
+          && data.email is string && data.email.size() > 0 && data.email.size() <= 128
           && data.role is string && data.role in ['admin', 'agent'];
       }
     }
@@ -49,46 +50,93 @@ service cloud.firestore {
       allow write: if isAdmin() && isValidConfig(incoming());
 
       function isValidConfig(data) {
-        return data.keys().hasAll(['capilarCost', 'camionCost', 'palletCost', 'taxRate'])
-          && data.capilarCost is number && data.capilarCost >= 0
-          && data.camionCost is number && data.camionCost >= 0
-          && data.palletCost is number && data.palletCost >= 0
-          && data.taxRate is number && data.taxRate >= 0;
+        return data.keys().hasAll(['halfTruckDoubleDropFee', 'defaultAmortizationYears', 'truckCostPerKm', 'palletCostPerKm'])
+          && data.halfTruckDoubleDropFee is number && data.halfTruckDoubleDropFee >= 0
+          && data.defaultAmortizationYears is number && data.defaultAmortizationYears >= 0
+          && data.truckCostPerKm is number && data.truckCostPerKm >= 0
+          && data.palletCostPerKm is number && data.palletCostPerKm >= 0;
       }
     }
 
     // --- Business Cases ---
     match /businessCases/{caseId} {
-      // Apply isValidId to document ID path variables for single-document target operations
-      allow get: if isValidId(caseId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && isValidId(caseId) && (existing().userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && isValidBusinessCase(incoming()) && (
-        incoming().userId == request.auth.uid
-      );
-      allow update: if isValidId(caseId) && isSignedIn() && isValidBusinessCase(incoming()) && (
-        (existing().userId == request.auth.uid && incoming().userId == request.auth.uid) || isAdmin()
-      );
-      allow delete: if isValidId(caseId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(caseId)
+        && (incoming().userId == request.auth.uid)
+        // Orphaned Write prevention: The user profile must exist in users
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && isValidBusinessCase(incoming());
+      allow update: if isSignedIn() && isValidId(caseId)
+        && (existing().userId == request.auth.uid || isAdmin())
+        && (incoming().userId == existing().userId) // Prevent identity spoofing on update
+        && (!('createdAt' in incoming()) || !('createdAt' in existing()) || incoming().createdAt == existing().createdAt) // Prevent timestamp spoofing
+        && isValidBusinessCase(incoming());
+      allow delete: if isSignedIn() && isValidId(caseId) && (existing().userId == request.auth.uid || isAdmin());
 
       function isValidBusinessCase(data) {
         return data.keys().hasAll(['userId', 'title'])
-          && data.userId is string && data.userId.size() > 0
-          && data.title is string && data.title.size() > 0 && data.title.size() < 200
-          && (data.keys().hasAll(['years']) ? (data.years is number && data.years >= 0) : true)
-          && (data.keys().hasAll(['references']) ? (data.references is list && data.references.size() < 100) : true);
+          && data.userId is string && data.userId.size() <= 128
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+          // Ghost Field Protection (Payload 3)
+          && !('isVerified' in data)
+          && !('isAdminApproved' in data)
+          // Resource Exhaustion Protection (Payload 8)
+          && (!('references' in data) || (data.references is list && data.references.size() <= 100));
       }
     }
 
-    // --- Catalog Products ---
-    match /catalogProducts/{productId} {
+    // --- Administration Collections ---
+    match /catalogProducts/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() && isValidProduct(incoming());
-
+      allow create, update: if isAdmin() && isValidId(id) && isValidProduct(incoming());
+      allow delete: if isAdmin() && isValidId(id);
       function isValidProduct(data) {
-        return data.keys().hasAll(['name', 'family', 'brand'])
-          && data.name is string && data.name.size() > 0
-          && data.family is string && data.family.size() > 0
-          && data.brand is string && data.brand.size() > 0;
+        return data.keys().hasAll(['name', 'family', 'brand', 'cost'])
+          && data.name is string && data.name.size() <= 200
+          && data.cost is number && data.cost >= 0;
+      }
+    }
+
+    match /brandLogistics/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(id);
+      allow delete: if isAdmin() && isValidId(id);
+    }
+
+    match /coldEquipment/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(id);
+      allow delete: if isAdmin() && isValidId(id);
+    }
+
+    match /maintenanceCosts/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(id);
+      allow delete: if isAdmin() && isValidId(id);
+    }
+
+    match /fixedCosts/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(id);
+      allow delete: if isAdmin() && isValidId(id);
+    }
+
+    match /capillaryRules/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(id);
+      allow delete: if isAdmin() && isValidId(id);
+    }
+
+    match /coraTraining/{id} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidId(id) && isValidCoraTrainingRule(incoming());
+      allow delete: if isAdmin() && isValidId(id);
+      
+      function isValidCoraTrainingRule(data) {
+        return data.keys().hasAll(['phrase', 'response'])
+          && data.phrase is string && data.phrase.size() >= 1 && data.phrase.size() <= 300
+          && data.response is string && data.response.size() >= 1 && data.response.size() <= 2000;
       }
     }
   }

@@ -1,11 +1,10 @@
 import { GlobalConfig } from "./types";
 
 export const DEFAULT_CONFIG: GlobalConfig = {
-  capilarCost: 0.15, // € per liter
-  camionCost: 0.05, // € per liter  
-  palletCost: 0.08, // € per liter
-  baseProductionCost: 0.40, // € per liter
-  taxRate: 21, // %
+  halfTruckDoubleDropFee: 50,
+  defaultAmortizationYears: 5,
+  truckCostPerKm: 1.2,
+  palletCostPerKm: 0.15
 };
 
 export const REGIONS = [
